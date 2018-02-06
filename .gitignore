@@ -104,3 +104,4 @@ hashenv/
 # stk specific
 hash/hash_data.json
 hash/hash_list.txt
+hash/panrc.py
