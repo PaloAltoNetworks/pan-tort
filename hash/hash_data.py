@@ -6,6 +6,7 @@ import json
 import time
 
 from panafapi_hacked import panafapi_hacked
+from panrc import *
 
 def main():
 
@@ -13,10 +14,6 @@ def main():
     sys.path[:0] = [os.path.join(libpath, os.pardir, 'lib')]
     thismodule = sys.modules[__name__]
 
-# initialize xml variable dictionary
-
-    api_key = 'daa45e07-6635-44f7-9ee0-61fd7c453878'
-    hostname = 'autofocus.paloaltonetworks.com'
 
     malware_values = {
                         '0': 'benign',
