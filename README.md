@@ -27,11 +27,12 @@
 ```python hash_data.py```
 <br/>
 ### 10. Viewing output json files
-**hash_data_stats.json:**  quick stats for verdicts and signature coverage (active or inactive)
+*hash_data_stats.json:  quick stats for verdicts and signature coverage (active or inactive)
 <br/>
-**hash_data_pretty.json:**  raw data view of per-hash Autofocus responses
+*hash_data_pretty.json:  raw data view of per-hash Autofocus responses
 <br/>
-**hash_data_estack.json:**  raw data output with index to bulk load into ElasticSearch/Kibana for visualization
+*hash_data_estack.json:  raw data output with index to bulk load into ElasticSearch/Kibana for visualization
+
 [ElasticStack Visualization](https://github.com/PaloAltoNetworks/pan-tort/wiki/elasticStack)
 <br/><br/>
 ## Best Practices and Optional Configuration
