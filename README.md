@@ -17,10 +17,13 @@
 ### 5. Download required libraries
 ```pip install -r requirements.txt```
 <br/>
-### 6. Create the panrc.py file for your installation to have Autofocus API access
+### 6. Change into hash directory
+```cd hash```
+<br/>
+### 7. Create the panrc.py file with the Autofocus URL and api key
 [Create panrc.py](https://github.com/PaloAltoNetworks/pan-tort/wiki/panrc)
 <br/>
-### 7. Create the hash_list.txt file to read hashes for Autofocus contextual queries
+### 8. Create the hash_list.txt file with a list of MD5 hashes
 [Create hash_list.txt](https://github.com/PaloAltoNetworks/pan-tort/wiki/hash_list)
 <br/>
 ### 9. Run hash_data.py to begin queries and retrieving verdict, filetype, and coverage information
