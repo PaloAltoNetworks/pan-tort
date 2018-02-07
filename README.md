@@ -1,7 +1,7 @@
-# Hash Search as part of the Testing Output Response Toolkit
+## Hash Search as part of the Testing Output Response Toolkit
 
 
-# Install & start the hash search application
+## Install & start the hash search application
 ### 1. Clone repo
 ```git clone https://www.github.com/PaloAltoNetworks/pan-tort.git```
 <br/>
@@ -28,7 +28,9 @@
 <br/>
 ### 10. Viewing output json files
 * hash_data_stats.json:  quick stats for verdicts and signature coverage (active or inactive)
+
 * hash_data_pretty.json:  raw data view of per-hash Autofocus responses
+
 * hash_data_estack.json:  raw data output with index to bulk load into ElasticSearch/Kibana for visualization
 
 [ElasticStack Visualization](https://github.com/PaloAltoNetworks/pan-tort/wiki/elasticStack)
