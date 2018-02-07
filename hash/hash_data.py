@@ -4,6 +4,7 @@ import os
 import os.path
 import json
 import time
+import re
 
 from panafapi_hacked import panafapi_hacked
 from panrc import *
@@ -23,6 +24,14 @@ def main():
 
     AFoutput_dict = {}
     hashList = []
+
+ # Use counters to create a simple output stats file in tandem with json details   
+
+    HashCounters = {}
+    HashCountValues = ['total samples', 'malware','mal_inactive_sig', 'mal_active_sig', 'grayware', 'benign', 'No sample found']
+
+    for value in HashCountValues:
+        HashCounters[value] = 0
 
 # Used for Elasticsearch bulk import
 # Formatting requires index data per document record
@@ -86,6 +95,15 @@ def main():
             print('\nFile URL Sig coverage: \n' + json.dumps(AFoutput_analysis['coverage']['fileurl_sig'], indent=4, sort_keys=False))
             hash_data_dict['fileurl_sig'] = AFoutput_analysis['coverage']['fileurl_sig']
 
+# Check all the sig states [true or false] to see active vs inactive sigs for malware
+
+            if verdict_text == 'malware':
+                sigSearch = json.dumps(hash_data_dict)
+                if sigSearch.find('true') == -1:
+                    HashCounters['mal_inactive_sig'] +=1
+                else:
+                    HashCounters['mal_active_sig'] +=1                   
+
  
 # If no hash found then tag as 'no sample found'
 # These hashes can be check in VirusTotal to see if unsupported file type for Wildfire
@@ -93,17 +111,41 @@ def main():
         else:
             hash_data_dict['verdict'] = 'No sample found'
             print('\nNo sample found in Autofocus for this hash')
+            verdict_text = 'No sample found'
+
+            
+        HashCounters[verdict_text] +=1
 
 
-# write hash data to text file
+# write hash data to text file; for index = 1 create new file; for index > 1 append to file
+# hash_data_estack uses the non-pretty format with index to bulk load into ElasticSearch
+# hash_data_pretty has readable formatting to view the raw hash context data
+
         if index == 1:
-            with open('hash_data.json','w') as hashFile:
+            with open('hash_data_estack.json','w') as hashFile:
                 hashFile.write(json.dumps(index_tag_full, indent=None, sort_keys=False) + "\n")
                 hashFile.write(json.dumps(hash_data_dict, indent=None, sort_keys=False) + "\n")
+
+            with open('hash_data_pretty.json', 'w') as hashFile:
+                hashFile.write(json.dumps(hash_data_dict, indent=4, sort_keys=False) + "\n")
+
         else:
-            with open('hash_data.json','a') as hashFile:
+            with open('hash_data_estack.json','a') as hashFile:
                 hashFile.write(json.dumps(index_tag_full, indent=None, sort_keys=False) + "\n")
                 hashFile.write(json.dumps(hash_data_dict, indent=None, sort_keys=False) + "\n")
+
+            with open('hash_data_pretty.json', 'a') as hashFile:
+                hashFile.write(json.dumps(hash_data_dict, indent=4, sort_keys=False) + "\n")
+
+            with open('hash_data_stats.json', 'w') as hashFile:
+                hashFile.write(json.dumps(HashCounters, indent=4, sort_keys=False) + "\n")
+
+# print and write to file the current hash count stats
+        HashCounters['total samples'] = index
+        print('\nCurrent hash count stats:\n')
+        print(json.dumps(HashCounters, indent=4, sort_keys=False) + '\n')
+        with open('hash_data_stats.json', 'w') as hashFile:
+                hashFile.write(json.dumps(HashCounters, indent=4, sort_keys=False) + "\n")
 
 
         index += 1
