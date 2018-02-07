@@ -18,10 +18,10 @@
 ```pip install -r requirements.txt```
 <br/><br/>
 ### 6. Create the panrc.py file for your installation to have Autofocus API access
-[Configuring SafeNetworking](docs/sfn-config.md)
+[Create panrc.py](https://github.com/PaloAltoNetworks/pan-tort/wiki/panrc)
 <br/><br/>
 ### 7. Create the hash_list.txt file to read hashes for Autofocus contextual queries
-[Configuring SafeNetworking](docs/sfn-config.md)
+[Create hash_list.txt](https://github.com/PaloAltoNetworks/pan-tort/wiki/panrc)
 
 <br/><br/>
 ### 9. Run hash_data.py to begin queries and retrieving verdict, filetype, and coverage information
@@ -29,13 +29,13 @@
 ```python hash_data.py```
 <br/><br/>
 ### 10. Viewing output json files
-hash_data_stats.json >>> quick stats for verdicts and signature coverage (active or inactive)
+hash_data_stats.json:   quick stats for verdicts and signature coverage (active or inactive)
 <br/>
-hash_data_pretty.json >>> raw data view of per-hash Autofocus responses
+hash_data_pretty.json:   raw data view of per-hash Autofocus responses
 <br/>
-hash_data_estack.json >>> raw data output with index to bulk load into ElasticSearch/Kibana for visualization
-[NGFW Configuration](docs/NGFW/ngfw-configuration.md)
+hash_data_estack.json:   raw data output with index to bulk load into ElasticSearch/Kibana for visualization
+[ElasticStack Visualization](https://github.com/PaloAltoNetworks/pan-tort/wiki/elasticStack)
 <br/><br/>
 <br/><br/>
 ## Best Practices and Optional Configuration
-You should be all set.  For even more ideas on what you can do with the system and other things that you can download and install to get the most out of SafeNetworking, checkout the [Wiki](https://github.com/PaloAltoNetworks/pan-tort/wiki)!!
+You should be all set.  For even more ideas on what you can do with the system and other things that you can download and install to get the most out of pan-tort, checkout the [Wiki](https://github.com/PaloAltoNetworks/pan-tort/wiki)!!
