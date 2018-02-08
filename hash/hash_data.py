@@ -39,7 +39,7 @@ def main():
 
     HashCounters = {}
     HashCountValues = ['total samples', 'malware', 'mal_inactive_sig', 'mal_active_sig',
-                       'grayware', 'benign', 'No sample found']
+                       'mal_no_sig', 'grayware', 'benign', 'No sample found']
 
     for value in HashCountValues:
         HashCounters[value] = 0
@@ -118,10 +118,12 @@ def main():
 
             if verdict_text == 'malware':
                 sigSearch = json.dumps(hash_data_dict)
-                if sigSearch.find('true') == -1:
+                if sigSearch.find('true') != -1:
+                    HashCounters['mal_active_sig'] += 1
+                elif sigSearch.find('true') == -1 and sigSearch.find('false') != -1:
                     HashCounters['mal_inactive_sig'] += 1
                 else:
-                    HashCounters['mal_active_sig'] += 1
+                    HashCounters['mal_no_sig'] += 1
 
 
 # If no hash found then tag as 'no sample found'
