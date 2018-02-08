@@ -34,7 +34,7 @@ import pan.afapi
 debug = 0
 
 
-def panafapi_hacked(hostname, api_key, action, md5hash):
+def panafapi_hacked(hostname, api_key, action, hashtype, hashvalue):
 
 
     options = {
@@ -71,11 +71,11 @@ def panafapi_hacked(hostname, api_key, action, md5hash):
 
         options['samples'] = True
         lastYear = int(time.strftime("%Y")) - 1
-        query_arg = '{{"query":{{"operator":"all","children":[{{"field":"sample.md5","operator":"is","value":"{0}"}}]}},"scope":"global","size":1,"from":0,"sort":{{"create_date":{{"order":"desc"}}}}}}'.format(md5hash)
+        query_arg = '{{"query":{{"operator":"all","children":[{{"field":"sample.{0}","operator":"is","value":"{1}"}}]}},"scope":"global","size":1,"from":0,"sort":{{"create_date":{{"order":"desc"}}}}}}'.format(hashtype, hashvalue)
 
     elif action == 'sample_analysis':
         options['sample_analysis'] = True
-        options['hash'] = md5hash
+        options['hash'] = hashvalue
         query_arg = '{"coverage":"true"}'
   
     options['json_requests'].append(process_arg(query_arg))

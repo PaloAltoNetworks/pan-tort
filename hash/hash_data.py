@@ -21,6 +21,17 @@ def main():
 
     malware_values = {'0': 'benign', '1': 'malware', '2': 'grayware'}
 
+#supported hashtypes are: md5, sha1, sha256
+
+    if len(sys.argv) < 2:
+        print('\nEnter the hash type after hash_data.py [md5, sha1, sha256]\n')
+        sys.exit(1)
+    elif sys.argv[1] == 'md5' or sys.argv[1] == 'sha1' or sys.argv[1] == 'sha256':
+        hashtype = sys.argv[1]
+    else:
+        print('\nOnly hash types md5, sha1, or sha256 are supported\n')
+        sys.exit(1)
+
     AFoutput_dict = {}
     hashList = []
 
@@ -28,7 +39,7 @@ def main():
 
     HashCounters = {}
     HashCountValues = ['total samples', 'malware', 'mal_inactive_sig', 'mal_active_sig',
-                       'grayware', 'benign', 'No sample found']
+                       'mal_no_sig', 'grayware', 'benign', 'No sample found']
 
     for value in HashCountValues:
         HashCounters[value] = 0
@@ -45,28 +56,29 @@ def main():
 
     index = 1
 
-# read the hash list file - a simple text list of md5 hashes
+# read the hash list file - a simple text list of malware sample hashes
 # the text file is converted to a simple python list
 
     with open('hash_list.txt', 'r') as hashFile:
         hashList = hashFile.read().splitlines()
 
-# query each md5 hash to get malware verdict
+# query each hash to get malware verdict
 # index lines are specific to Elastic search bulk inputs
 
-    for md5hash in hashList:
+    for hashvalue in hashList:
         index_tag_inner['_id'] = index
         index_tag_full['index'] = index_tag_inner
         hash_data_dict = {}
-        print('\nworking with hash = {0}\n'.format(md5hash))
-        af_output = panafapi_hacked(hostname, api_key, 'find_hash', md5hash)
+        print('\nworking with hash = {0}\n'.format(hashvalue))
+        af_output = panafapi_hacked(hostname, api_key, 'find_hash', hashtype, hashvalue)
 
 
 # af_output is the json response from the Autofocus query
 # AFoutput is json output converted to python dictionary
 
         AFoutput_dict = json.loads(af_output)
-        hash_data_dict['md5hash'] = md5hash
+        hash_data_dict['hashtype'] = hashtype
+        hash_data_dict['hashvalue'] = hashvalue
 
         if AFoutput_dict['hits']:
 
@@ -83,7 +95,7 @@ def main():
 # Print each coverage section to the screen - can comment out the print statements
 
             print('\nSearching Autofocus for current signature coverage...\n')
-            af_output = panafapi_hacked(hostname, api_key, 'sample_analysis',
+            af_output = panafapi_hacked(hostname, api_key, 'sample_analysis', hashtype,
                                         hash_data_dict['sha256hash'])
             AFoutput_analysis = json.loads(af_output)
 
@@ -106,10 +118,12 @@ def main():
 
             if verdict_text == 'malware':
                 sigSearch = json.dumps(hash_data_dict)
-                if sigSearch.find('true') == -1:
+                if sigSearch.find('true') != -1:
+                    HashCounters['mal_active_sig'] += 1
+                elif sigSearch.find('true') == -1 and sigSearch.find('false') != -1:
                     HashCounters['mal_inactive_sig'] += 1
                 else:
-                    HashCounters['mal_active_sig'] += 1
+                    HashCounters['mal_no_sig'] += 1
 
 
 # If no hash found then tag as 'no sample found'
