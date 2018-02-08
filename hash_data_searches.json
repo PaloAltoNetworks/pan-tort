@@ -1,0 +1,65 @@
+[
+  {
+    "_id": "c2b11030-0b60-11e8-a38a-8becd44ee9a9",
+    "_type": "search",
+    "_source": {
+      "title": "Active Sigs MIssed",
+      "description": "",
+      "hits": 0,
+      "columns": [
+        "hashvalue",
+        "filetype"
+      ],
+      "sort": [
+        "_score",
+        "desc"
+      ],
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"93a6c4d0-0cee-11e8-a38a-8becd44ee9a9\",\"highlightAll\":true,\"version\":true,\"query\":{\"language\":\"lucene\",\"query\":\"wf_av_sig.currently_present_daily:\\\"true\\\" OR wf_av_sig.currently_present_5min:\\\"true\\\" OR wf_av_sig.currently_present_15min:\\\"true\\\" OR dns_sig.currently_present_5min:\\\"true\\\" OR dns_sig.currently_present_15min:\\\"true\\\" OR dns_sig.currently_present_daily:\\\"true\\\"\"},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "2decc680-0b63-11e8-a38a-8becd44ee9a9",
+    "_type": "search",
+    "_source": {
+      "title": "Inactive Sigs MIssed",
+      "description": "",
+      "hits": 0,
+      "columns": [
+        "hashvalue",
+        "filetype"
+      ],
+      "sort": [
+        "_score",
+        "desc"
+      ],
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"93a6c4d0-0cee-11e8-a38a-8becd44ee9a9\",\"highlightAll\":true,\"version\":true,\"query\":{\"language\":\"lucene\",\"query\":\"verdict:\\\"malware\\\" AND NOT (wf_av_sig.currently_present_daily:\\\"true\\\" OR wf_av_sig.currently_present_5min:\\\"true\\\" OR wf_av_sig.currently_present_15min:\\\"true\\\" OR dns_sig.currently_present_5min:\\\"true\\\" OR dns_sig.currently_present_15min:\\\"true\\\" OR dns_sig.currently_present_daily:\\\"true\\\") AND (wf_av_sig.currently_present_daily:\\\"false\\\" OR wf_av_sig.currently_present_5min:\\\"false\\\" OR wf_av_sig.currently_present_15min:\\\"true\\\" OR dns_sig.currently_present_5min:\\\"false\\\" OR dns_sig.currently_present_15min:\\\"false\\\" OR dns_sig.currently_present_daily:\\\"false\\\")\"},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "d8303fa0-0cfd-11e8-a38a-8becd44ee9a9",
+    "_type": "search",
+    "_source": {
+      "title": "No Sigs Found",
+      "description": "",
+      "hits": 0,
+      "columns": [
+        "hashvalue",
+        "filetype"
+      ],
+      "sort": [
+        "_score",
+        "desc"
+      ],
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"93a6c4d0-0cee-11e8-a38a-8becd44ee9a9\",\"highlightAll\":true,\"version\":true,\"query\":{\"language\":\"lucene\",\"query\":\"verdict:\\\"malware\\\" AND NOT (wf_av_sig.currently_present_daily:(\\\"true\\\" or \\\"false\\\") OR wf_av_sig.currently_present_5min:(\\\"true\\\" or \\\"false\\\") OR wf_av_sig.currently_present_15min:(\\\"true\\\" or \\\"false\\\") OR dns_sig.currently_present_5min:(\\\"true\\\" or \\\"false\\\") OR dns_sig.currently_present_15min:(\\\"true\\\" or \\\"false\\\") OR dns_sig.currently_present_daily:(\\\"true\\\" or \\\"false\\\"))\"},\"filter\":[]}"
+      }
+    }
+  }
+]
