@@ -27,7 +27,9 @@
 [Create hash_list.txt](https://github.com/PaloAltoNetworks/pan-tort/wiki/hash_list)
 <br/>
 ### 9. Run hash_data.py to begin queries and retrieving verdict, filetype, and coverage information
-```python hash_data.py```
+```python hash_data.py <hashtype>```
+<br/>
+Supported hashtypes are md5, sha1, and sha256
 <br/>
 ### 10. Viewing output json files
 * hash_data_stats.json:  quick stats for verdicts and signature coverage (active or inactive)
