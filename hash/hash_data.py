@@ -8,10 +8,9 @@ import sys
 import os
 import os.path
 import json
-import requests
 import time
+import requests
 
-# from panafapi_hacked import panafapi_hacked
 from panrc import hostname, api_key
 
 def main():
@@ -73,21 +72,30 @@ def main():
         hash_data_dict = {}
         print('\nworking with hash = {0}\n'.format(hashvalue))
 
-        query = {"operator":"all","children":[{"field":"sample.sha256","operator":"is","value":hashvalue}]}
+        query = {"operator": "all",
+                 "children": [{"field":"sample.sha256", "operator":"is", "value":hashvalue}]
+                }
 
         search_values = {"apiKey": api_key,
-                    "query": query,
-                    "size": 1,
-                    "from": 0,
-                    "sort": {"create_date": {"order": "desc"}},
-                    "scope": "global",
-                    "artifactSource": "af"}
+                         "query": query,
+                         "size": 1,
+                         "from": 0,
+                         "sort": {"create_date": {"order": "desc"}},
+                         "scope": "global",
+                         "artifactSource": "af"
+                        }
 
         headers = {"Content-Type": "application/json"}
-        search_url = 'https://autofocus.paloaltonetworks.com/api/v1.0/samples/search'
-
-        search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
-        print('     Search query posted to Autofocus')
+        search_url = 'https://{0}/api/v1.0/samples/search'.format(hostname)
+        try:
+            search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
+            print('     Search query posted to Autofocus\n')
+            search.raise_for_status()
+        except requests.exceptions.HTTPError:
+            print(search)
+            print(search.text)
+            print('\nCorrect errors and rerun the application\n')
+            sys.exit()
 
         search_dict = {}
         search_dict = json.loads(search.text)
@@ -95,14 +103,19 @@ def main():
         cookie = search_dict['af_cookie']
         print('     Tracking cookie is {0}'.format(cookie))
 
-        af_output = {}
-
         for timer in range(60):
 
             time.sleep(5)
-            results_url = 'https://autofocus.paloaltonetworks.com/api/v1.0/samples/results/' + cookie
-            results_values = {"apiKey": api_key}
-            results = requests.post(results_url, headers=headers, data=json.dumps(results_values))
+            try:
+                results_url = 'https://{0}/api/v1.0/samples/results/'.format(hostname) + cookie
+                results_values = {"apiKey": api_key}
+                results = requests.post(results_url, headers=headers, data=json.dumps(results_values))
+                results.raise_for_status()
+            except requests.exceptions.HTTPError:
+                print(results)
+                print(results.text)
+                print('\nCorrect errors and rerun the application\n')
+                sys.exit()
 
             AFoutput_dict = results.json()
 
@@ -113,9 +126,7 @@ def main():
                     break
             else:
                 print('     Autofocus still queuing up the search...')
-            
 
-# af_output is the json response from the Autofocus query
 # AFoutput is json output converted to python dictionary
 
         hash_data_dict['hashtype'] = hashtype
@@ -140,24 +151,28 @@ def main():
 
             print('\n     Searching Autofocus for current signature coverage...\n')
 
-
             search_values = {"apiKey": api_key,
-                             "coverage": 'true', 
-                             "sections": ["coverage"], 
+                             "coverage": 'true',
+                             "sections": ["coverage"],
                             }
 
             headers = {"Content-Type": "application/json"}
-            search_url = 'https://autofocus.paloaltonetworks.com/api/v1.0/sample/{0}/analysis'.format(hash_data_dict['sha256hash'])
+            search_url = 'https://{0}/api/v1.0/sample/{1}/analysis'.format(hostname, hash_data_dict['sha256hash'])
 
-            search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
-            print('     Search query posted to Autofocus')
+            try:
+                search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
+                search.raise_for_status()
+            except requests.exceptions.HTTPError:
+                print(search)
+                print(search.text)
+                print('\nCorrect errors and rerun the application\n')
+                sys.exit()
 
-            AFoutput_analysis = {}
-            AFoutput_analysis = json.loads(search.text)
-            
-            ''' 
+            """
             # Comment or uncomment this section to see or hide sig query results
             # ------------------------------
+            AFoutput_analysis = {}
+            AFoutput_analysis = json.loads(search.text)
             print('\nDNS Sig coverage: \n' +
                   json.dumps(AFoutput_analysis['coverage']['dns_sig'],
                              indent=4, sort_keys=False))
@@ -173,8 +188,8 @@ def main():
                              indent=4, sort_keys=False))
             hash_data_dict['fileurl_sig'] = AFoutput_analysis['coverage']['fileurl_sig']
 
-            #-------------------------------
-            '''
+            # -------------------------------
+            """
 
 # Check all the sig states [true or false] to see active vs inactive sigs for malware
 
@@ -196,9 +211,7 @@ def main():
             print('\n     No sample found in Autofocus for this hash')
             verdict_text = 'No sample found'
 
-
         HashCounters[verdict_text] += 1
-
 
 # write hash data to text file; for index = 1 create new file; for index > 1 append to file
 # hash_data_estack uses the non-pretty format with index to bulk load into ElasticSearch
@@ -229,7 +242,6 @@ def main():
         print(json.dumps(HashCounters, indent=4, sort_keys=False) + '\n')
         with open('hash_data_stats.json', 'w') as hashFile:
             hashFile.write(json.dumps(HashCounters, indent=4, sort_keys=False) + "\n")
-
 
         index += 1
 
