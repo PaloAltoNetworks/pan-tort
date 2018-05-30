@@ -1,1 +1,1 @@
--e git+https://github.com/kevinsteves/pan-python.git@370c99ae3b6b93660394bf7b46493fa4b48b00ef#egg=pan_python
+requests==2.18.4

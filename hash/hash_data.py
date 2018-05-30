@@ -8,8 +8,9 @@ import sys
 import os
 import os.path
 import json
+import time
+import requests
 
-from panafapi_hacked import panafapi_hacked
 from panrc import hostname, api_key
 
 def main():
@@ -69,14 +70,65 @@ def main():
         index_tag_inner['_id'] = index
         index_tag_full['index'] = index_tag_inner
         hash_data_dict = {}
-        print('\nworking with hash = {0}\n'.format(hashvalue))
-        af_output = panafapi_hacked(hostname, api_key, 'find_hash', hashtype, hashvalue)
+        print('\nworking with hash = {0}'.format(hashvalue))
 
+        query = {"operator": "all",
+                 "children": [{"field":"sample.sha256", "operator":"is", "value":hashvalue}]
+                }
 
-# af_output is the json response from the Autofocus query
+        search_values = {"apiKey": api_key,
+                         "query": query,
+                         "size": 1,
+                         "from": 0,
+                         "sort": {"create_date": {"order": "desc"}},
+                         "scope": "global",
+                         "artifactSource": "af"
+                        }
+
+        headers = {"Content-Type": "application/json"}
+        search_url = 'https://{0}/api/v1.0/samples/search'.format(hostname)
+        try:
+            search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
+            print('     Search query posted to Autofocus')
+            search.raise_for_status()
+        except requests.exceptions.HTTPError:
+            print(search)
+            print(search.text)
+            print('\nCorrect errors and rerun the application\n')
+            sys.exit()
+
+        search_dict = {}
+        search_dict = json.loads(search.text)
+
+        cookie = search_dict['af_cookie']
+        print('     Tracking cookie is {0}'.format(cookie))
+
+        for timer in range(60):
+
+            time.sleep(5)
+            try:
+                results_url = 'https://{0}/api/v1.0/samples/results/'.format(hostname) + cookie
+                results_values = {"apiKey": api_key}
+                results = requests.post(results_url, headers=headers, data=json.dumps(results_values))
+                results.raise_for_status()
+            except requests.exceptions.HTTPError:
+                print(results)
+                print(results.text)
+                print('\nCorrect errors and rerun the application\n')
+                sys.exit()
+
+            AFoutput_dict = results.json()
+
+            if 'total' in AFoutput_dict:
+                if AFoutput_dict['total'] == 0:
+                    print('     Now waiting for a hit...')
+                else:
+                    break
+            else:
+                print('     Autofocus still queuing up the search...')
+
 # AFoutput is json output converted to python dictionary
 
-        AFoutput_dict = json.loads(af_output)
         hash_data_dict['hashtype'] = hashtype
         hash_data_dict['hashvalue'] = hashvalue
 
@@ -89,30 +141,57 @@ def main():
             hash_data_dict['verdict'] = verdict_text
             hash_data_dict['filetype'] = AFoutput_dict['hits'][0]['_source']['filetype']
             hash_data_dict['sha256hash'] = AFoutput_dict['hits'][0]['_source']['sha256']
-            print('\nHash verdict is {0}\n'.format(verdict_text))
+            hash_data_dict['create_date'] = AFoutput_dict['hits'][0]['_source']['create_date']
+            if 'tag' in AFoutput_dict['hits'][0]['_source']:
+                hash_data_dict['tag'] = AFoutput_dict['hits'][0]['_source']['tag']
+            print('     Hash verdict is {0}'.format(verdict_text))
 
 # second AF query to get coverage info from sample analysis
 # Print each coverage section to the screen - can comment out the print statements
 
-            print('\nSearching Autofocus for current signature coverage...\n')
-            af_output = panafapi_hacked(hostname, api_key, 'sample_analysis', hashtype,
-                                        hash_data_dict['sha256hash'])
-            AFoutput_analysis = json.loads(af_output)
+            print('     Searching Autofocus for current signature coverage...')
+
+            search_values = {"apiKey": api_key,
+                             "coverage": 'true',
+                             "sections": ["coverage"],
+                            }
+
+            headers = {"Content-Type": "application/json"}
+            search_url = 'https://{0}/api/v1.0/sample/{1}/analysis'.format(hostname, hash_data_dict['sha256hash'])
+
+            try:
+                search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
+                search.raise_for_status()
+            except requests.exceptions.HTTPError:
+                print(search)
+                print(search.text)
+                print('\nCorrect errors and rerun the application\n')
+                sys.exit()
+
+            AFoutput_analysis = {}
+            AFoutput_analysis = json.loads(search.text)
+            hash_data_dict['dns_sig'] = AFoutput_analysis['coverage']['dns_sig']
+            hash_data_dict['wf_av_sig'] = AFoutput_analysis['coverage']['wf_av_sig']
+            hash_data_dict['fileurl_sig'] = AFoutput_analysis['coverage']['fileurl_sig']
+
+            """
+            # Comment or uncomment this section to see or hide sig query results
+            # ------------------------------
 
             print('\nDNS Sig coverage: \n' +
                   json.dumps(AFoutput_analysis['coverage']['dns_sig'],
                              indent=4, sort_keys=False))
-            hash_data_dict['dns_sig'] = AFoutput_analysis['coverage']['dns_sig']
 
             print('\nWF_AV Sig coverage: \n' +
                   json.dumps(AFoutput_analysis['coverage']['wf_av_sig'],
                              indent=4, sort_keys=False))
-            hash_data_dict['wf_av_sig'] = AFoutput_analysis['coverage']['wf_av_sig']
 
             print('\nFile URL Sig coverage: \n' +
                   json.dumps(AFoutput_analysis['coverage']['fileurl_sig'],
                              indent=4, sort_keys=False))
-            hash_data_dict['fileurl_sig'] = AFoutput_analysis['coverage']['fileurl_sig']
+
+            # -------------------------------
+            """
 
 # Check all the sig states [true or false] to see active vs inactive sigs for malware
 
@@ -125,18 +204,15 @@ def main():
                 else:
                     HashCounters['mal_no_sig'] += 1
 
-
 # If no hash found then tag as 'no sample found'
 # These hashes can be check in VirusTotal to see if unsupported file type for Wildfire
 
         else:
             hash_data_dict['verdict'] = 'No sample found'
-            print('\nNo sample found in Autofocus for this hash')
+            print('\n     No sample found in Autofocus for this hash')
             verdict_text = 'No sample found'
 
-
         HashCounters[verdict_text] += 1
-
 
 # write hash data to text file; for index = 1 create new file; for index > 1 append to file
 # hash_data_estack uses the non-pretty format with index to bulk load into ElasticSearch
@@ -168,9 +244,7 @@ def main():
         with open('hash_data_stats.json', 'w') as hashFile:
             hashFile.write(json.dumps(HashCounters, indent=4, sort_keys=False) + "\n")
 
-
         index += 1
-
 
 if __name__ == '__main__':
     main()
