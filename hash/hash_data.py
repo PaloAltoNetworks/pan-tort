@@ -8,8 +8,10 @@ import sys
 import os
 import os.path
 import json
+import requests
+import time
 
-from panafapi_hacked import panafapi_hacked
+# from panafapi_hacked import panafapi_hacked
 from panrc import hostname, api_key
 
 def main():
@@ -70,13 +72,52 @@ def main():
         index_tag_full['index'] = index_tag_inner
         hash_data_dict = {}
         print('\nworking with hash = {0}\n'.format(hashvalue))
-        af_output = panafapi_hacked(hostname, api_key, 'find_hash', hashtype, hashvalue)
 
+        query = {"operator":"all","children":[{"field":"sample.sha256","operator":"is","value":hashvalue}]}
+
+        search_values = {"apiKey": api_key,
+                    "query": query,
+                    "size": 1,
+                    "from": 0,
+                    "sort": {"create_date": {"order": "desc"}},
+                    "scope": "global",
+                    "artifactSource": "af"}
+
+        headers = {"Content-Type": "application/json"}
+        search_url = 'https://autofocus.paloaltonetworks.com/api/v1.0/samples/search'
+
+        search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
+        print('     Search query posted to Autofocus')
+
+        search_dict = {}
+        search_dict = json.loads(search.text)
+
+        cookie = search_dict['af_cookie']
+        print('     Tracking cookie is {0}'.format(cookie))
+
+        af_output = {}
+
+        for timer in range(60):
+
+            time.sleep(5)
+            results_url = 'https://autofocus.paloaltonetworks.com/api/v1.0/samples/results/' + cookie
+            results_values = {"apiKey": api_key}
+            results = requests.post(results_url, headers=headers, data=json.dumps(results_values))
+
+            AFoutput_dict = results.json()
+
+            if 'total' in AFoutput_dict:
+                if AFoutput_dict['total'] == 0:
+                    print('     Now waiting for a hit...')
+                else:
+                    break
+            else:
+                print('     Autofocus still queuing up the search...')
+            
 
 # af_output is the json response from the Autofocus query
 # AFoutput is json output converted to python dictionary
 
-        AFoutput_dict = json.loads(af_output)
         hash_data_dict['hashtype'] = hashtype
         hash_data_dict['hashvalue'] = hashvalue
 
@@ -89,16 +130,34 @@ def main():
             hash_data_dict['verdict'] = verdict_text
             hash_data_dict['filetype'] = AFoutput_dict['hits'][0]['_source']['filetype']
             hash_data_dict['sha256hash'] = AFoutput_dict['hits'][0]['_source']['sha256']
-            print('\nHash verdict is {0}\n'.format(verdict_text))
+            hash_data_dict['create_date'] = AFoutput_dict['hits'][0]['_source']['create_date']
+            if 'tag' in AFoutput_dict['hits'][0]['_source']:
+                hash_data_dict['tag'] = AFoutput_dict['hits'][0]['_source']['tag']
+            print('\n     Hash verdict is {0}\n'.format(verdict_text))
 
 # second AF query to get coverage info from sample analysis
 # Print each coverage section to the screen - can comment out the print statements
 
-            print('\nSearching Autofocus for current signature coverage...\n')
-            af_output = panafapi_hacked(hostname, api_key, 'sample_analysis', hashtype,
-                                        hash_data_dict['sha256hash'])
-            AFoutput_analysis = json.loads(af_output)
+            print('\n     Searching Autofocus for current signature coverage...\n')
 
+
+            search_values = {"apiKey": api_key,
+                             "coverage": 'true', 
+                             "sections": ["coverage"], 
+                            }
+
+            headers = {"Content-Type": "application/json"}
+            search_url = 'https://autofocus.paloaltonetworks.com/api/v1.0/sample/{0}/analysis'.format(hash_data_dict['sha256hash'])
+
+            search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
+            print('     Search query posted to Autofocus')
+
+            AFoutput_analysis = {}
+            AFoutput_analysis = json.loads(search.text)
+            
+            ''' 
+            # Comment or uncomment this section to see or hide sig query results
+            # ------------------------------
             print('\nDNS Sig coverage: \n' +
                   json.dumps(AFoutput_analysis['coverage']['dns_sig'],
                              indent=4, sort_keys=False))
@@ -113,6 +172,9 @@ def main():
                   json.dumps(AFoutput_analysis['coverage']['fileurl_sig'],
                              indent=4, sort_keys=False))
             hash_data_dict['fileurl_sig'] = AFoutput_analysis['coverage']['fileurl_sig']
+
+            #-------------------------------
+            '''
 
 # Check all the sig states [true or false] to see active vs inactive sigs for malware
 
@@ -131,7 +193,7 @@ def main():
 
         else:
             hash_data_dict['verdict'] = 'No sample found'
-            print('\nNo sample found in Autofocus for this hash')
+            print('\n     No sample found in Autofocus for this hash')
             verdict_text = 'No sample found'
 
 
@@ -170,7 +232,6 @@ def main():
 
 
         index += 1
-
 
 if __name__ == '__main__':
     main()
