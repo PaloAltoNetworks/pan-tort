@@ -70,7 +70,7 @@ def main():
         index_tag_inner['_id'] = index
         index_tag_full['index'] = index_tag_inner
         hash_data_dict = {}
-        print('\nworking with hash = {0}\n'.format(hashvalue))
+        print('\nworking with hash = {0}'.format(hashvalue))
 
         query = {"operator": "all",
                  "children": [{"field":"sample.sha256", "operator":"is", "value":hashvalue}]
@@ -89,7 +89,7 @@ def main():
         search_url = 'https://{0}/api/v1.0/samples/search'.format(hostname)
         try:
             search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
-            print('     Search query posted to Autofocus\n')
+            print('     Search query posted to Autofocus')
             search.raise_for_status()
         except requests.exceptions.HTTPError:
             print(search)
@@ -144,12 +144,12 @@ def main():
             hash_data_dict['create_date'] = AFoutput_dict['hits'][0]['_source']['create_date']
             if 'tag' in AFoutput_dict['hits'][0]['_source']:
                 hash_data_dict['tag'] = AFoutput_dict['hits'][0]['_source']['tag']
-            print('\n     Hash verdict is {0}\n'.format(verdict_text))
+            print('     Hash verdict is {0}'.format(verdict_text))
 
 # second AF query to get coverage info from sample analysis
 # Print each coverage section to the screen - can comment out the print statements
 
-            print('\n     Searching Autofocus for current signature coverage...\n')
+            print('     Searching Autofocus for current signature coverage...')
 
             search_values = {"apiKey": api_key,
                              "coverage": 'true',
@@ -168,25 +168,27 @@ def main():
                 print('\nCorrect errors and rerun the application\n')
                 sys.exit()
 
+            AFoutput_analysis = {}
+            AFoutput_analysis = json.loads(search.text)
+            hash_data_dict['dns_sig'] = AFoutput_analysis['coverage']['dns_sig']
+            hash_data_dict['wf_av_sig'] = AFoutput_analysis['coverage']['wf_av_sig']
+            hash_data_dict['fileurl_sig'] = AFoutput_analysis['coverage']['fileurl_sig']
+
             """
             # Comment or uncomment this section to see or hide sig query results
             # ------------------------------
-            AFoutput_analysis = {}
-            AFoutput_analysis = json.loads(search.text)
+
             print('\nDNS Sig coverage: \n' +
                   json.dumps(AFoutput_analysis['coverage']['dns_sig'],
                              indent=4, sort_keys=False))
-            hash_data_dict['dns_sig'] = AFoutput_analysis['coverage']['dns_sig']
 
             print('\nWF_AV Sig coverage: \n' +
                   json.dumps(AFoutput_analysis['coverage']['wf_av_sig'],
                              indent=4, sort_keys=False))
-            hash_data_dict['wf_av_sig'] = AFoutput_analysis['coverage']['wf_av_sig']
 
             print('\nFile URL Sig coverage: \n' +
                   json.dumps(AFoutput_analysis['coverage']['fileurl_sig'],
                              indent=4, sort_keys=False))
-            hash_data_dict['fileurl_sig'] = AFoutput_analysis['coverage']['fileurl_sig']
 
             # -------------------------------
             """
@@ -201,7 +203,6 @@ def main():
                     HashCounters['mal_inactive_sig'] += 1
                 else:
                     HashCounters['mal_no_sig'] += 1
-
 
 # If no hash found then tag as 'no sample found'
 # These hashes can be check in VirusTotal to see if unsupported file type for Wildfire
