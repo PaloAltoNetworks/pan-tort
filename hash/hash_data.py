@@ -5,25 +5,294 @@ queries to get verdict/filetype and then signature coverage data
 This provides contextual information in test environments beyond just a hash miss
 """
 import sys
-import os
-import os.path
 import json
 import time
 import requests
 
 from panrc import hostname, api_key
 
+
+def init_hash_counters():
+
+    """
+    initialize hash counters
+    :return: send back hash counters = zero
+    """
+
+    hash_counters = {}
+    hash_count_values = ['total samples', 'malware', 'mal_inactive_sig', 'mal_active_sig',
+                         'mal_no_sig', 'grayware', 'benign', 'phishing', 'No sample found']
+
+    for value in hash_count_values:
+        hash_counters[value] = 0
+
+    return hash_counters
+
+
+def elk_index(elk_index_name):
+
+    """
+    set up elasticsearch bulk load index
+    :param elk_index_name: name of data index in elasticsearch
+    :return: index tag to write as line in the output json file
+    """
+
+    index_tag_full = {}
+    index_tag_inner = {}
+    index_tag_inner['_index'] = elk_index_name
+    index_tag_inner['_type'] = elk_index_name
+    index_tag_full['index'] = index_tag_inner
+
+    return index_tag_full
+
+
+def get_hash_list(filename):
+
+    """
+    read in the list of hashes from a text file
+    :param filename: name of the hashfile
+    :return: return list of hash values
+    """
+
+    with open(filename, 'r') as hash_file:
+        hash_list = hash_file.read().splitlines()
+
+    return hash_list
+
+
+def init_query(hashvalue):
+
+    """
+    initial query into autofocus for a specific hash value
+    :param hashvalue: hash for the search
+    :return: autofocus response from initial query
+    """
+
+
+    query = {"operator": "all",
+             "children": [{"field":"sample.sha256", "operator":"is", "value":hashvalue}]
+            }
+
+    search_values = {"apiKey": api_key,
+                     "query": query,
+                     "size": 1,
+                     "from": 0,
+                     "sort": {"create_date": {"order": "desc"}},
+                     "scope": "public",
+                     "artifactSource": "af"
+                    }
+
+    headers = {"Content-Type": "application/json"}
+    search_url = f'https://{hostname}/api/v1.0/samples/search'
+
+    try:
+        search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
+        print('Search query posted to Autofocus')
+        search.raise_for_status()
+    except requests.exceptions.HTTPError:
+        print(search)
+        print(search.text)
+        print('\nCorrect errors and rerun the application\n')
+        sys.exit()
+
+    search_dict = json.loads(search.text)
+
+    return search_dict
+
+
+def get_query_results(search_dict):
+
+    """
+    keep checking autofocus until a hit or search complete
+    :param search_dict: initial response including the cookie value
+    :return: autofocus search results dictionary or null if no hits
+    """
+
+    autofocus_results = {}
+
+    cookie = search_dict['af_cookie']
+    print(f'Tracking cookie is {cookie}')
+
+    for timer in range(60):
+
+        time.sleep(5)
+        try:
+            results_url = f'https://{hostname}/api/v1.0/samples/results/' + cookie
+            headers = {"Content-Type": "application/json"}
+            results_values = {"apiKey": api_key}
+            results = requests.post(results_url, headers=headers, data=json.dumps(results_values))
+            results.raise_for_status()
+        except requests.exceptions.HTTPError:
+            print(results)
+            print(results.text)
+            print('\nCorrect errors and rerun the application\n')
+            sys.exit()
+
+        autofocus_results = results.json()
+
+        if 'total' in autofocus_results:
+            if autofocus_results['total'] == 0 and autofocus_results['af_in_progress'] == 'true':
+                print('     Now waiting for a hit...')
+            elif autofocus_results['total'] == 0 and autofocus_results['af_in_progress'] == 'false':
+                break
+            else:
+                break
+        else:
+            print('Autofocus still queuing up the search...')
+
+    return autofocus_results
+
+
+def get_sample_data(hashvalue, af_hashtype, hash_counters):
+
+    """
+    primary function to do both the init query and keep checking until search complete
+    :param hashvalue: sample hash value
+    :param af_hashtype: hash type to send into the init query
+    :param hash_counters: updating running stats counters
+    :return: update dictionary with sample data
+    """
+
+    malware_values = {'0': 'benign', '1': 'malware', '2': 'grayware', '3': 'phishing'}
+
+
+    hash_data_dict = {}
+    print(f'\nworking with hash = {hashvalue}')
+
+    search_dict = init_query(hashvalue)
+    autofocus_results = get_query_results(search_dict)
+
+
+    # AFoutput is json output converted to python dictionary
+
+    hash_data_dict['hashtype'] = af_hashtype
+    hash_data_dict['hashvalue'] = hashvalue
+
+    if autofocus_results['hits']:
+
+    # initial AF query to get sample data include sha256 hash and WF verdict
+
+        verdict_num = autofocus_results['hits'][0]['_source']['malware']
+        verdict_text = malware_values[str(verdict_num)]
+        hash_data_dict['verdict'] = verdict_text
+        hash_data_dict['filetype'] = autofocus_results['hits'][0]['_source']['filetype']
+        hash_data_dict['sha256hash'] = autofocus_results['hits'][0]['_source']['sha256']
+        hash_data_dict['create_date'] = autofocus_results['hits'][0]['_source']['create_date']
+        if 'tag' in autofocus_results['hits'][0]['_source']:
+            hash_data_dict['tag'] = autofocus_results['hits'][0]['_source']['tag']
+        print(f'Hash verdict is {verdict_text}')
+
+        hash_counters[verdict_text] += 1
+
+    # If no hash found then tag as 'no sample found'
+    # These hashes can be check in VirusTotal to see if unsupported file type for Wildfire
+    else:
+        hash_data_dict['verdict'] = 'No sample found'
+        hash_counters['No sample found'] += 1
+        print('\nNo sample found in Autofocus for this hash')
+
+    return hash_data_dict
+
+
+def get_sig_coverage(sample_data, hash_counters):
+
+    """
+    secondary search into sample artifacts to get sig coverage data
+    :param sample_data: base sample data dictionary to append sig data
+    :param hash_counters: running stats counters
+    :return: complete hash data set and hash running counters
+    """
+
+    print('Searching Autofocus for current signature coverage...')
+
+    search_values = {"apiKey": api_key,
+                     "coverage": 'true',
+                     "sections": ["coverage"],
+                    }
+
+    headers = {"Content-Type": "application/json"}
+    hashvalue = sample_data['sha256hash']
+    search_url = f'https://{hostname}/api/v1.0/sample/{hashvalue}/analysis'
+
+    try:
+        search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
+        search.raise_for_status()
+    except requests.exceptions.HTTPError:
+        print(search)
+        print(search.text)
+        print('\nCorrect errors and rerun the application\n')
+        sys.exit()
+
+    results_analysis = json.loads(search.text)
+    sample_data['dns_sig'] = results_analysis['coverage']['dns_sig']
+    sample_data['wf_av_sig'] = results_analysis['coverage']['wf_av_sig']
+    sample_data['fileurl_sig'] = results_analysis['coverage']['fileurl_sig']
+
+    # Check all the sig states [true or false] to see active vs inactive sigs for malware
+
+    if sample_data['verdict'] == 'malware':
+        sig_search = json.dumps(sample_data)
+        if sig_search.find('true') != -1:
+            hash_counters['mal_active_sig'] += 1
+        elif sig_search.find('true') == -1 and sig_search.find('false') != -1:
+            hash_counters['mal_inactive_sig'] += 1
+        else:
+            hash_counters['mal_no_sig'] += 1
+
+        # If no hash found then tag as 'no sample found'
+        # These hashes can be check in VirusTotal to see if unsupported file type for Wildfire
+
+    return sample_data, hash_counters
+
+
+def write_to_file(index, index_tag_full, hash_data_dict, hash_counters):
+
+    """
+    write to 3 files: simple stats, full data as pretty json, and elasticsearch (estack) bulk load file
+    :param index: simple check to see if should append or write to file
+    :param index_tag_full: complete set of index data for json entry
+    :param hash_data_dict: sample and sig data for json entry
+    :param hash_counters: running stats counters
+    :return: go back when write complete
+    """
+
+    if index == 1:
+        with open('hash_data_estack.json', 'w') as hash_file:
+            hash_file.write(json.dumps(index_tag_full, indent=None, sort_keys=False) + "\n")
+            hash_file.write(json.dumps(hash_data_dict, indent=None, sort_keys=False) + "\n")
+
+        with open('hash_data_pretty.json', 'w') as hash_file:
+            hash_file.write(json.dumps(hash_data_dict, indent=4, sort_keys=False) + "\n")
+
+    else:
+        with open('hash_data_estack.json', 'a') as hash_file:
+            hash_file.write(json.dumps(index_tag_full, indent=None, sort_keys=False) + "\n")
+            hash_file.write(json.dumps(hash_data_dict, indent=None, sort_keys=False) + "\n")
+
+        with open('hash_data_pretty.json', 'a') as hash_file:
+            hash_file.write(json.dumps(hash_data_dict, indent=4, sort_keys=False) + "\n")
+
+    # print and write to file the current hash count stats
+    hash_counters['total samples'] = index
+    print('\nCurrent hash count stats:\n')
+    print(json.dumps(hash_counters, indent=4, sort_keys=False) + '\n')
+    with open('hash_data_stats.json', 'w') as hash_file:
+        hash_file.write(json.dumps(hash_counters, indent=4, sort_keys=False) + "\n")
+
+    return
+
+
 def main():
 
     """hash_data main module"""
 
-    libpath = os.path.dirname(os.path.abspath(__file__))
-    sys.path[:0] = [os.path.join(libpath, os.pardir, 'lib')]
+    # Map starting index to 1 if a new run or one more than the last value as a continuing run
+    # Init hash counters to zero
 
-    malware_values = {'0': 'benign', '1': 'malware', '2': 'grayware'}
+    hashfile = 'hash_list.txt'
+    index_name = 'hash-data'
 
-#supported hashtypes are: md5, sha1, sha256
-
+    # supported hashtypes are: md5, sha1, sha256
     if len(sys.argv) < 2:
         print('\nEnter the hash type after hash_data.py [md5, sha1, sha256]\n')
         sys.exit(1)
@@ -33,221 +302,34 @@ def main():
         print('\nOnly hash types md5, sha1, or sha256 are supported\n')
         sys.exit(1)
 
-    AFoutput_dict = {}
-    hashList = []
-
- # Use counters to create a simple output stats file in tandem with json details
-
-    HashCounters = {}
-    HashCountValues = ['total samples', 'malware', 'mal_inactive_sig', 'mal_active_sig',
-                       'mal_no_sig', 'grayware', 'benign', 'No sample found']
-
-    for value in HashCountValues:
-        HashCounters[value] = 0
-
-# Used for Elasticsearch bulk import
-# Formatting requires index data per document record
-    index_tag_full = {}
-    index_tag_inner = {}
-    index_tag_inner['_index'] = 'hash-data'
-    index_tag_inner['_type'] = 'hash-data'
-
-# Map starting index to 1 if a new run or one more than the last value as a continuing run
-# Useful with augmenting data or errors result in the app ending prematurely
-
     index = 1
+    hash_counters = init_hash_counters()
 
-# read the hash list file - a simple text list of malware sample hashes
-# the text file is converted to a simple python list
+    # read hash list from file
+    hash_list = get_hash_list(hashfile)
 
-    with open('hash_list.txt', 'r') as hashFile:
-        hashList = hashFile.read().splitlines()
+    # iterate through the hash list getting sample and signature data
 
-# query each hash to get malware verdict
-# index lines are specific to Elastic search bulk inputs
+    for hashvalue in hash_list:
 
-    for hashvalue in hashList:
-        index_tag_inner['_id'] = index
-        index_tag_full['index'] = index_tag_inner
         hash_data_dict = {}
-        print('\nworking with hash = {0}'.format(hashvalue))
 
-        query = {"operator": "all",
-                 "children": [{"field":"sample.sha256", "operator":"is", "value":hashvalue}]
-                }
+    # Used for Elasticsearch bulk import
+    # Formatting requires index data per document record
+        index_tag_full = elk_index(index_name)
 
-        search_values = {"apiKey": api_key,
-                         "query": query,
-                         "size": 1,
-                         "from": 0,
-                         "sort": {"create_date": {"order": "desc"}},
-                         "scope": "public",
-                         "artifactSource": "af"
-                        }
+    # query Autofocus to get sample and signature coverage data
+        sample_data = get_sample_data(hashvalue, hashtype, hash_counters)
 
-        headers = {"Content-Type": "application/json"}
-        search_url = 'https://{0}/api/v1.0/samples/search'.format(hostname)
-        try:
-            search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
-            print('     Search query posted to Autofocus')
-            search.raise_for_status()
-        except requests.exceptions.HTTPError:
-            print(search)
-            print(search.text)
-            print('\nCorrect errors and rerun the application\n')
-            sys.exit()
+        if sample_data['verdict'] != 'No sample found':
+            hash_data_dict, hash_counters = \
+                get_sig_coverage(sample_data, hash_counters)
 
-        search_dict = {}
-        search_dict = json.loads(search.text)
-
-        cookie = search_dict['af_cookie']
-        print('     Tracking cookie is {0}'.format(cookie))
-
-        for timer in range(60):
-
-            time.sleep(5)
-            try:
-                results_url = 'https://{0}/api/v1.0/samples/results/'.format(hostname) + cookie
-                results_values = {"apiKey": api_key}
-                results = requests.post(results_url, headers=headers, data=json.dumps(results_values))
-                print(results.text)
-                results.raise_for_status()
-            except requests.exceptions.HTTPError:
-                print(results)
-                print(results.text)
-                print('\nCorrect errors and rerun the application\n')
-                sys.exit()
-
-            AFoutput_dict = results.json()
-
-            if 'total' in AFoutput_dict:
-                if AFoutput_dict['total'] == 0 and AFoutput_dict['af_in_progress'] == 'true':
-                    print('     Now waiting for a hit...')
-                elif AFoutput_dict['total'] == 0 and AFoutput_dict['af_in_progress'] == 'false':
-                    break
-                else:
-                    break
-            else:
-                print('     Autofocus still queuing up the search...')
-
-# AFoutput is json output converted to python dictionary
-
-        hash_data_dict['hashtype'] = hashtype
-        hash_data_dict['hashvalue'] = hashvalue
-
-        if AFoutput_dict['hits']:
-
-# initial AF query to get sample data include sha256 hash and WF verdict
-
-            verdict_num = AFoutput_dict['hits'][0]['_source']['malware']
-            verdict_text = malware_values[str(verdict_num)]
-            hash_data_dict['verdict'] = verdict_text
-            hash_data_dict['filetype'] = AFoutput_dict['hits'][0]['_source']['filetype']
-            hash_data_dict['sha256hash'] = AFoutput_dict['hits'][0]['_source']['sha256']
-            hash_data_dict['create_date'] = AFoutput_dict['hits'][0]['_source']['create_date']
-            if 'tag' in AFoutput_dict['hits'][0]['_source']:
-                hash_data_dict['tag'] = AFoutput_dict['hits'][0]['_source']['tag']
-            print('     Hash verdict is {0}'.format(verdict_text))
-
-# second AF query to get coverage info from sample analysis
-# Print each coverage section to the screen - can comment out the print statements
-
-            print('     Searching Autofocus for current signature coverage...')
-
-            search_values = {"apiKey": api_key,
-                             "coverage": 'true',
-                             "sections": ["coverage"],
-                            }
-
-            headers = {"Content-Type": "application/json"}
-            search_url = 'https://{0}/api/v1.0/sample/{1}/analysis'.format(hostname, hash_data_dict['sha256hash'])
-
-            try:
-                search = requests.post(search_url, headers=headers, data=json.dumps(search_values))
-                search.raise_for_status()
-            except requests.exceptions.HTTPError:
-                print(search)
-                print(search.text)
-                print('\nCorrect errors and rerun the application\n')
-                sys.exit()
-
-            AFoutput_analysis = {}
-            AFoutput_analysis = json.loads(search.text)
-            hash_data_dict['dns_sig'] = AFoutput_analysis['coverage']['dns_sig']
-            hash_data_dict['wf_av_sig'] = AFoutput_analysis['coverage']['wf_av_sig']
-            hash_data_dict['fileurl_sig'] = AFoutput_analysis['coverage']['fileurl_sig']
-
-            """
-            # Comment or uncomment this section to see or hide sig query results
-            # ------------------------------
-
-            print('\nDNS Sig coverage: \n' +
-                  json.dumps(AFoutput_analysis['coverage']['dns_sig'],
-                             indent=4, sort_keys=False))
-
-            print('\nWF_AV Sig coverage: \n' +
-                  json.dumps(AFoutput_analysis['coverage']['wf_av_sig'],
-                             indent=4, sort_keys=False))
-
-            print('\nFile URL Sig coverage: \n' +
-                  json.dumps(AFoutput_analysis['coverage']['fileurl_sig'],
-                             indent=4, sort_keys=False))
-
-            # -------------------------------
-            """
-
-# Check all the sig states [true or false] to see active vs inactive sigs for malware
-
-            if verdict_text == 'malware':
-                sigSearch = json.dumps(hash_data_dict)
-                if sigSearch.find('true') != -1:
-                    HashCounters['mal_active_sig'] += 1
-                elif sigSearch.find('true') == -1 and sigSearch.find('false') != -1:
-                    HashCounters['mal_inactive_sig'] += 1
-                else:
-                    HashCounters['mal_no_sig'] += 1
-
-# If no hash found then tag as 'no sample found'
-# These hashes can be check in VirusTotal to see if unsupported file type for Wildfire
-
-        else:
-            hash_data_dict['verdict'] = 'No sample found'
-            print('\n     No public sample found in Autofocus for this hash')
-            verdict_text = 'No sample found'
-
-        HashCounters[verdict_text] += 1
-
-# write hash data to text file; for index = 1 create new file; for index > 1 append to file
-# hash_data_estack uses the non-pretty format with index to bulk load into ElasticSearch
-# hash_data_pretty has readable formatting to view the raw hash context data
-
-        if index == 1:
-            with open('hash_data_estack.json', 'w') as hashFile:
-                hashFile.write(json.dumps(index_tag_full, indent=None, sort_keys=False) + "\n")
-                hashFile.write(json.dumps(hash_data_dict, indent=None, sort_keys=False) + "\n")
-
-            with open('hash_data_pretty.json', 'w') as hashFile:
-                hashFile.write(json.dumps(hash_data_dict, indent=4, sort_keys=False) + "\n")
-
-        else:
-            with open('hash_data_estack.json', 'a') as hashFile:
-                hashFile.write(json.dumps(index_tag_full, indent=None, sort_keys=False) + "\n")
-                hashFile.write(json.dumps(hash_data_dict, indent=None, sort_keys=False) + "\n")
-
-            with open('hash_data_pretty.json', 'a') as hashFile:
-                hashFile.write(json.dumps(hash_data_dict, indent=4, sort_keys=False) + "\n")
-
-            with open('hash_data_stats.json', 'w') as hashFile:
-                hashFile.write(json.dumps(HashCounters, indent=4, sort_keys=False) + "\n")
-
-# print and write to file the current hash count stats
-        HashCounters['total samples'] = index
-        print('\nCurrent hash count stats:\n')
-        print(json.dumps(HashCounters, indent=4, sort_keys=False) + '\n')
-        with open('hash_data_stats.json', 'w') as hashFile:
-            hashFile.write(json.dumps(HashCounters, indent=4, sort_keys=False) + "\n")
+        # write output to file - per hash cycle to view updates during runtime
+        write_to_file(index, index_tag_full, hash_data_dict, hash_counters)
 
         index += 1
+
 
 if __name__ == '__main__':
     main()
