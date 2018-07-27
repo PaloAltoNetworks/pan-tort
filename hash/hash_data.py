@@ -81,7 +81,7 @@ def main():
                          "size": 1,
                          "from": 0,
                          "sort": {"create_date": {"order": "desc"}},
-                         "scope": "global",
+                         "scope": "public",
                          "artifactSource": "af"
                         }
 
@@ -110,6 +110,7 @@ def main():
                 results_url = 'https://{0}/api/v1.0/samples/results/'.format(hostname) + cookie
                 results_values = {"apiKey": api_key}
                 results = requests.post(results_url, headers=headers, data=json.dumps(results_values))
+                print(results.text)
                 results.raise_for_status()
             except requests.exceptions.HTTPError:
                 print(results)
@@ -120,8 +121,10 @@ def main():
             AFoutput_dict = results.json()
 
             if 'total' in AFoutput_dict:
-                if AFoutput_dict['total'] == 0:
+                if AFoutput_dict['total'] == 0 and AFoutput_dict['af_in_progress'] == 'true':
                     print('     Now waiting for a hit...')
+                elif AFoutput_dict['total'] == 0 and AFoutput_dict['af_in_progress'] == 'false':
+                    break
                 else:
                     break
             else:
@@ -209,7 +212,7 @@ def main():
 
         else:
             hash_data_dict['verdict'] = 'No sample found'
-            print('\n     No sample found in Autofocus for this hash')
+            print('\n     No public sample found in Autofocus for this hash')
             verdict_text = 'No sample found'
 
         HashCounters[verdict_text] += 1
