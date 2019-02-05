@@ -1,0 +1,38 @@
+name: tort
+
+repositories:
+# Source code for pan-tort
+  - name: PAN-TORT
+    url:  https://github.com/PaloAltoNetworks/pant-tort-source.git
+    branch: master
+    destination_directory: pan-tort-source
+
+views:
+
+  - name: ''
+    class: CNCView
+    menu: TORT
+    menu_option: Welcome
+    attributes:
+      template_name: pan_cnc/welcome.html
+    context:
+      title: Run Tort
+      description: Run Tort
+      documentation_link: http://github.com/PaloAltoNetworks/pan-tort
+
+
+# Options grouped by architecture
+  - name: tortload
+    class: ChooseSnippetByLabelView
+    menu: TORT
+    menu_option: Run Tort
+    attributes:
+      header: Select Config Type
+      title: Select Configuration Option
+
+  - name: provision
+    class: ProvisionSnippetView
+
+
+
+
