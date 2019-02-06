@@ -1,6 +1,8 @@
 
 # Test Output Results Toolkit
 
+[![GitHub release](https://img.shields.io/github/release/PaloAltoNetworks/pan-tort.svg?style=for-the-badge)](https://github.com/PaloAltoNetworks/pan-tort/releases)
+[![GitHub repo size in bytes](https://img.shields.io/github/repo-size/badges/shields.svg?style=for-the-badge)](https://github.com/PaloAltoNetworks/pan-tort) <br>
 This utility is provided to enable Systems Engineers to load hashes from failed Ixia and/or Spirent security tests.  It will then process the hashes against the Palo Alto Networks Threat Intelligence Cloud to determine the reason why the hash was not found/blocked/inidcated in the passing results. 
 
 It interfaces with both Autofocus (pull) and ELK (optional push) API interfaces.
