@@ -3,7 +3,7 @@ name: tort
 repositories:
 # Source code for pan-tort
   - name: PAN-TORT
-    url:  https://github.com/PaloAltoNetworks/pant-tort-source.git
+    url:  https://github.com/PaloAltoNetworks/pan-tort-source.git
     branch: master
     destination_directory: pan-tort-source
 
@@ -16,19 +16,27 @@ views:
     attributes:
       template_name: pan_cnc/welcome.html
     context:
-      title: Run Tort
-      description: Run Tort
+      title: Test Output Result Toolkit 
+      description: >
+        Use this tool to drastically shorten the amount of time you will
+        spend searching for sample data from the Ixia and Spirent tests that spot out
+        hashes of failed tests. 
       documentation_link: http://github.com/PaloAltoNetworks/pan-tort
+      next: run_tort
 
 
 # Options grouped by architecture
-  - name: tortload
-    class: ChooseSnippetByLabelView
+  - name: run_tort
+    class: tortView
     menu: TORT
     menu_option: Run Tort
     attributes:
-      header: Select Config Type
-      title: Select Configuration Option
+      header: TORT
+      title: Advanced Threat Analysis
+      help_text: |
+        Query Tag - query tag name 
+        List of Hashes - hashes from failed output of the test 
+        Output Type - Return a json document or store it in your ELK stack
 
   - name: provision
     class: ProvisionSnippetView
