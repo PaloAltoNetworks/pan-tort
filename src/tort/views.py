@@ -1,18 +1,17 @@
 
+from .pan_tort import process_hashes
 from pan_cnc.views import CNCBaseAuth, CNCBaseFormView, ProvisionSnippetView
-import requests
+from pan_cnc.lib import cnc_utils
+from django.shortcuts import render
+
+
 
 class tortView(CNCBaseFormView):
+    # define initial dynamic form from this snippet metadata
+    snippet = 'run_tort'
     
-    
-    def generate_dynamic_form(self):
-
-       # define initial dynamic form from this snippet metadata
-        snippet = 'run_tort'
-        next_url = '/pantort/process_hashes'
-
-        def get_snippet(self):
-            return self.snippet
+    def get_snippet(self):
+        return self.snippet
 
     # once the form has been submitted and we have all the values placed in the workflow, execute this
     def form_valid(self, form):
@@ -22,11 +21,19 @@ class tortView(CNCBaseFormView):
         query_tag = workflow.get('query_tag')
         hashes = workflow.get('hashes')
         output_type = workflow.get('output_type')
-        payload = {'query_tag': query_tag,'hashes': hashes, 'output_type': output_type}
+        api_key = workflow.get('api_key')
+        payload = {
+            'query_tag': query_tag,'hashes': hashes,
+            'output_type': output_type, 'api_key': api_key}
+        tortHost = cnc_utils.get_config_value("TORT_HOST","localhost")
+        tortPort = cnc_utils.get_config_value("TORT_PORT", 5010)
         
-        r = requests.post(f'http://{tortHost}:{tortPort}', data=payload)
+        resp = process_hashes(payload)
+        print(f"The response is: {resp}")
+        # resp = requests.post(f'http://{tortHost}:{tortPort}', data=payload)
+        # print(resp.headers)
 
-        
-        print('set device-group and template to firewall name')
+        results = super().get_context_data()
+        results['results'] = resp
 
-        return super().form_valid(form)
+        return render(self.request, 'pan_cnc/results.html', context=results)

@@ -1,0 +1,33 @@
+name: run_tort
+label: Run the TORT application
+description: Runs TORT against list of hashes
+type: app
+extends:
+
+labels:
+  service_type: tort_assess
+
+variables:
+- name: api_key
+  description: Autofocus API Key
+  default: 
+  type_hint: text
+- name: query_tag
+  description: Query Tag
+  default: tort-01
+  type_hint: text
+- name: hashes
+  description: List of hashes (newline delimited)
+  default: 
+  type_hint: text_area
+- name: output_type
+  description: Output Type
+  default: text
+  type_hint: dropdown
+  dd_list:
+    - key: Text
+      value: text
+    - key: Elasticsearch
+      value: elasticsearch
+
+snippets:
