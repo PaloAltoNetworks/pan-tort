@@ -1,5 +1,5 @@
 
-# Test Ouput Results Toolkit
+# Test Output Results Toolkit
 
 This utility is provided to enable Systems Engineers to load hashes from failed Ixia and/or Spirent security tests.  It will then process the hashes against the Palo Alto Networks Threat Intelligence Cloud to determine the reason why the hash was not found/blocked/inidcated in the passing results. 
 
