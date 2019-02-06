@@ -1,36 +1,34 @@
 
-# MSSP Configuration Loader
+# Test Ouput Results Toolkit
 
-This utility is provided to enable API-based configuration using the
-[Palo Alto Networks MSSP templates](https://github.com/scotchoaf/mssp-templates/tree/81dev)
+This utility is provided to enable Systems Engineers to load hashes from failed Ixia and/or Spirent security tests.  It will then process the hashes against the Palo Alto Networks Threat Intelligence Cloud to determine the reason why the hash was not found/blocked/inidcated in the passing results. 
 
-It interfaces with both Panorama and the firewall PAN-OS API interfaces.
+It interfaces with both Autofocus (pull) and ELK (optional push) API interfaces.
 
-### Internet Gateway service
+## How to run TORT
+The only *supported* way to run TORT is to run the docker container:
+```
+docker run -p 8088:80 paloaltonetworks/pan-tort:latest
+```
+Once the container is up and running - point your browser to http://localhost:8088
 
-This uses the Gold-Silver-Bronze template set to configure tiered
-services based on MSSP offerings and device subscriptions.
+Login is paloalto/tort
 
-Templates include:
-
-    * internet gateway base config with interfaces, zones, routing
-
-    * gold/silver/bronze tier tags and security rules
-
-
-### GPCS
-
-This is based on remote network access to the internet using GPCS
-
-Template elements include:
-
-    * baseline GPCS config for new service onboarding
-
-    * remote network IPSEC onboarding
-
-    * sample CPE IPSEC configs that text render only, no API configuration
+NOTE:  This does not support pushing the results to ELK - yet
 
 
-
-
-
+# Advanced TORT - pushing to ELK
+To push the results to your ELK instance, you must have a .panrc in your home directory with the following entries (at minimum)
+```
+ELASTICSEARCH_HOST = "<ip of elasticsearch host>"
+ELASTICSEARCH_PORT = "<port - default es install port is 9200>"
+```
+Optionally you can also add your API key to the .panrc as well:
+```
+AUTOFOCUS_API_KEY = "<api_key>"
+```
+Once you have that in place you can start the container by mounting the .panrc inside the container
+```
+docker run -p 8088:80 -v ~/.panrc:/.panrc paloaltonetworks/pan-tort:latest
+```
+If you added the AF API key, you don't have to type it in anymore. :)
