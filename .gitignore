@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+**/snippets/**/
+!**/snippets/app
+!**/snippets/app/**
+!**/snippets/app/**/*
+
+
 # Distribution / packaging
 .Python
 env/
