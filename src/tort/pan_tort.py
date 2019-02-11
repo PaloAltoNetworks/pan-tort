@@ -24,19 +24,16 @@ Use at your own risk.
 
 '''
 
-
+import datetime
+import json
 import os
 import sys
 import time
-import json
-import logging
-import datetime
-import requests
-from pan_cnc.lib import cnc_utils
-from django_downloadview.shortcuts import sendfile
-from elasticsearch_dsl import connections
-from elasticsearch_dsl import DocType, Search, Date, Integer, Keyword, Text, Object
 
+import requests
+from elasticsearch_dsl import connections
+
+from pan_cnc.lib import cnc_utils
 
 
 def storeResults(results, outFile, outputType):
@@ -53,11 +50,12 @@ def storeResults(results, outFile, outputType):
         print(f"Writing results to {outFile}")
         with open(f"{outFile}", "a") as jsonFile:
             jsonFile.write(json.dumps(results, indent=4, sort_keys=False) + "\n")
-        return {outFile:"NULL"}
+        return {outFile: "NULL"}
     else:
         print(f"Results stored in DB")
-        print(f"Results are {results}") 
+        print(f"Results are {results}")
         return results
+
 
 def loadJSON(hashJSON):
     '''
@@ -68,15 +66,14 @@ def loadJSON(hashJSON):
         hashJSON {dict} -- The JSON to be stored in the DB
     '''
     yield {
-        "_index":"hash-data",
-        "_type":"document",
-        #"_id": f"{hashJSON['hashvalue']}",
+        "_index": "hash-data",
+        "_type": "document",
+        # "_id": f"{hashJSON['hashvalue']}",
         "_source": json.dumps(hashJSON)
     }
 
-        
-def init_hash_counters():
 
+def init_hash_counters():
     """
     Use counters to create a simple output stats file in tandem with json details
     Initialize counters to zero
@@ -93,7 +90,6 @@ def init_hash_counters():
 
 
 def elk_index(hashDict):
-
     """ Index setup for ELK Stack bulk install """
 
     index_tag_full = {}
@@ -106,7 +102,6 @@ def elk_index(hashDict):
 
 
 def get_hash_list(filename):
-
     """ read the hash list from file and load into a list """
 
     hash_list = []
@@ -118,15 +113,14 @@ def get_hash_list(filename):
 
 
 def init_query(af_ip, af_api_key, hashvalue):
-
     """
     initial API query post to Autofocus
     get_query_results used to check status and read query results
     """
 
     query = {"operator": "all",
-             "children": [{"field":"alias.hash", "operator":"contains", "value":hashvalue}]
-            }
+             "children": [{"field": "alias.hash", "operator": "contains", "value": hashvalue}]
+             }
 
     search_values = {"apiKey": af_api_key,
                      "query": query,
@@ -135,7 +129,7 @@ def init_query(af_ip, af_api_key, hashvalue):
                      "sort": {"create_date": {"order": "desc"}},
                      "scope": "global",
                      "artifactSource": "af"
-                    }
+                     }
 
     headers = {"Content-Type": "application/json"}
     search_url = f'https://{af_ip}/api/v1.0/samples/search'
@@ -158,7 +152,6 @@ def init_query(af_ip, af_api_key, hashvalue):
 
 
 def get_query_results(af_ip, af_api_key, search_dict):
-
     """ check for a hit and then retrieve search results when hit = 1 """
 
     autofocus_results = {}
@@ -166,7 +159,8 @@ def get_query_results(af_ip, af_api_key, search_dict):
     cookie = search_dict['af_cookie']
     print(f'Tracking cookie is {cookie}')
     query_status = ''
-    results_url = cnc_utils.get_config_value('AUTOFOCUS_RESULTS_URL','https://autofocus.paloaltonetworks.com/api/v1.0/samples/results/')
+    results_url = cnc_utils.get_config_value('AUTOFOCUS_RESULTS_URL',
+                                             'https://autofocus.paloaltonetworks.com/api/v1.0/samples/results/')
     cookie_url = results_url + cookie
     headers = {"Content-Type": "application/json"}
     results_values = {"apiKey": af_api_key}
@@ -174,7 +168,7 @@ def get_query_results(af_ip, af_api_key, search_dict):
     while query_status != 'FIN':
 
         time.sleep(5)
-        try:    
+        try:
             print(f"sending {cookie_url}")
             results = requests.post(url=cookie_url, headers=headers, data=json.dumps(results_values))
             results.raise_for_status()
@@ -199,18 +193,15 @@ def get_query_results(af_ip, af_api_key, search_dict):
 
 
 def get_sample_data(af_ip, af_api_key, hashvalue, af_hashtype, hash_counters):
-
     """ query each hash to gehashListString malware verdict and associated data """
 
     malware_values = {'0': 'bhashListStringnign', '1': 'malware', '2': 'grayware', '3': 'phishing'}
-
 
     hash_data_dict = {}
     print(f'\nworking with hash {hashvalue}')
 
     search_dict = init_query(af_ip, af_api_key, hashvalue)
     autofocus_results = get_query_results(af_ip, af_api_key, search_dict)
-
 
     # AFoutput is json output converted to python dictionary
 
@@ -219,7 +210,7 @@ def get_sample_data(af_ip, af_api_key, hashvalue, af_hashtype, hash_counters):
 
     if autofocus_results['hits']:
 
-    # initial AF query to get sample data include sha256 hash and WF verdict
+        # initial AF query to get sample data include sha256 hash and WF verdict
 
         verdict_num = autofocus_results['hits'][0]['_source']['malware']
         verdict_text = malware_values[str(verdict_num)]
@@ -245,7 +236,6 @@ def get_sample_data(af_ip, af_api_key, hashvalue, af_hashtype, hash_counters):
 
 
 def get_sig_coverage(af_ip, af_api_key, sample_data, hash_counters):
-
     """ for sample hits, second query to find signature coverage in sample analysis """
 
     print('Searching Autofocus for current signature coverage...')
@@ -253,7 +243,7 @@ def get_sig_coverage(af_ip, af_api_key, sample_data, hash_counters):
     search_values = {"apiKey": af_api_key,
                      "coverage": 'true',
                      "sections": ["coverage"],
-                    }
+                     }
 
     headers = {"Content-Type": "application/json"}
     hashvalue = sample_data['sha256hash']
@@ -286,13 +276,12 @@ def get_sig_coverage(af_ip, af_api_key, sample_data, hash_counters):
             hash_counters['mal_inactive_sig'] += 1
         else:
             hash_counters['mal_no_sig'] += 1
-    
+
     print(f"get_sig_coverage() returns {sample_data}")
     return sample_data, hash_counters
 
 
 def write_to_file(index, index_tag_full, hash_data_dict, hash_counters):
-
     """
     write hash data to text file; for index = 1 create new file; for index > 1 append to file
     hash_data_estack uses the non-pretty format with index to bulk load into ElasticSearch
@@ -326,18 +315,17 @@ def write_to_file(index, index_tag_full, hash_data_dict, hash_counters):
         hash_file.write(json.dumps(hash_counters, indent=4, sort_keys=False) + "\n")
 
 
-def processHashList(hashList,outputType,queryTag,hashType,apiKey):
-
+def processHashList(hashList, outputType, queryTag, hashType, apiKey):
     """hash_data main module"""
-    
+
     results = dict()
     outResults = dict()
     fileDate = datetime.datetime.now().strftime("%y-%m-%d-%H-%M")
     outFile = f"/tmp/{queryTag}_{fileDate}.json"
-    
+
     # Define the default Elasticsearch client
-    connections.create_connection(hosts=cnc_utils.get_config_value('ELASTICSEARCH_HOST','localhost'))
-    
+    connections.create_connection(hosts=cnc_utils.get_config_value('ELASTICSEARCH_HOST', 'localhost'))
+
     # Set the number of multi processes to use and cap it at 16 so
     # so we don't blow out the minute points on AutoFocus
     # multiProcNum = (app.config['TORT_POOL_COUNT'] 
@@ -352,15 +340,15 @@ def processHashList(hashList,outputType,queryTag,hashType,apiKey):
     #     return storeResults(results,outFile)
     # else:
     for hashData in hashList:
-        results = getHashInfo(hashData,outputType,queryTag,apiKey)
-        outResults.update(storeResults(results,outFile,outputType))
+        results = getHashInfo(hashData, outputType, queryTag, apiKey)
+        outResults.update(storeResults(results, outFile, outputType))
     if "text" in outputType:
         return f"{outFile}"
     else:
         return outResults
-    
 
-def getHashInfo(thisHash,outputType,queryTag,apiKey): 
+
+def getHashInfo(thisHash, outputType, queryTag, apiKey):
     print(apiKey)
     hostname = "autofocus.paloaltonetworks.com"
     hashType = "MD5"
@@ -369,13 +357,12 @@ def getHashInfo(thisHash,outputType,queryTag,apiKey):
     sampleData = {}
     hashDataDict = {}
 
-
     # query Autofocus to get sample and signature coverage data
     try:
         sampleData = get_sample_data(hostname, apiKey, thisHash, hashType, hashCounters)
     except Exception as e:
         print(f"Unable to get sample data--ERROR: {e}")
- 
+
     try:
         if sampleData['verdict'] != 'No sample found':
             hashDataDict, hashCounters = \
@@ -393,13 +380,13 @@ def getHashInfo(thisHash,outputType,queryTag,apiKey):
         try:
             result = helpers.bulk(es, loadJSON(hashDataDict))
             print(f"Result of indexing {thisHash} "
-                            f"is {result}")
+                  f"is {result}")
             if result[0] == 1:
-                return {thisHash:"SUCCESS"}
+                return {thisHash: "SUCCESS"}
             else:
-                return {thisHash:"FAILURE"}
+                return {thisHash: "FAILURE"}
         except Exception as e:
-            return {thisHash:f"Unknown error {e}"}
+            return {thisHash: f"Unknown error {e}"}
 
 
 def process_hashes(payload):
@@ -420,12 +407,12 @@ def process_hashes(payload):
         queryTag = postedJSON['query_tag']
         hashListString = postedJSON['hashes']
         outputType = postedJSON['output_type']
-        apiKey = postedJSON.get('api_key','')
-        hashType = 'MD5' #postedJSON['hash_type']
+        apiKey = postedJSON.get('api_key', '')
+        hashType = 'MD5'  # postedJSON['hash_type']
         if apiKey == "":
-            apiKey = cnc_utils.get_config_value("AUTOFOCUS_API_KEY","NOT-SET")
+            apiKey = cnc_utils.get_config_value("AUTOFOCUS_API_KEY", "NOT-SET")
         if apiKey == "NOT-SET":
-            return("There is no API key set in .panrc and there wasn't one entered")
+            return ("There is no API key set in .panrc and there wasn't one entered")
         # hash should have newlines replaced by HTML char for newline '%0A', 
         # let's split on that here to get a list
         # could also check for ',' and split on that too if necessary
@@ -448,20 +435,20 @@ def process_hashes(payload):
 
         # now we should have a valid hash list to work with
         print(f"Hash list is {hashList}")
-        
+
         if "text" in outputType:
-            outFile = processHashList(hashList,outputType,queryTag,hashType,apiKey)
+            outFile = processHashList(hashList, outputType, queryTag, hashType, apiKey)
             path, fileName = os.path.split(f"{outFile}")
             print(f"returning fileName is {fileName}")
             print(f"path is {path}")
             with open(outFile, "r") as myFile:
                 return myFile.read()
         else:
-            hashListResult = processHashList(hashList,outputType,queryTag,hashType,apiKey)
+            hashListResult = processHashList(hashList, outputType, queryTag, hashType, apiKey)
             print(f"{hashListResult}")
-            #return render_template('kibana_page.html',list=hashListResult)
-        
-        
+            # return render_template('kibana_page.html',list=hashListResult)
+
+
 
     except KeyError as ke:
         print(ke)
@@ -469,18 +456,13 @@ def process_hashes(payload):
     except Exception as e:
         print(e)
         errorMessage = f"Problem with query to Autofocus: {e}"
-        #abort(501, {'message': errorMessage})
-        #abort(501, {'message': f'Problem with query to Autofocus {e}'})
-        
+        # abort(501, {'message': errorMessage})
+        # abort(501, {'message': f'Problem with query to Autofocus {e}'})
 
 
-#@app.before_first_request
+# @app.before_first_request
 def init_application():
-
-   # Check to make sure we have the API key(s) set first
-    tortHost = cnc_utils.get_config_value("TORT_HOST","localhost")
+    # Check to make sure we have the API key(s) set first
+    tortHost = cnc_utils.get_config_value("TORT_HOST", "localhost")
     tortPort = cnc_utils.get_config_value("TORT_PORT", 5010)
     print(f'Starting TORT')
-
-
-
