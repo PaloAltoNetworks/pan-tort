@@ -1,11 +1,11 @@
 name: tort
 
-repositories:
+#repositories:
 # Source code for pan-tort
-  - name: PAN-TORT
-    url:  https://github.com/PaloAltoNetworks/pan-tort-source.git
-    branch: master
-    destination_directory: pan-tort-source
+#  - name: PAN-TORT
+#    url:  https://github.com/PaloAltoNetworks/pan-tort-source.git
+#    branch: master
+#    destination_directory: pan-tort-source
 
 views:
 

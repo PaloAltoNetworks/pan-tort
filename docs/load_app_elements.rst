@@ -9,8 +9,8 @@ usage of the iron skillet cnc app.
     These are sandbox instructions only and may not be required with container and other usage models
 
 
-Prequisites
------------
+Prerequisites
+-------------
 
     + clone the skeleton branch
 
@@ -30,12 +30,10 @@ Add and prep the pan-cnc submodule then start the server
 
 ::
 
-    git submodule add -b develop --force git@github.com:PaloAltoNetworks/pan-cnc.git ./cnc
-    cd cnc
+    git submodule init
+    git submodule update
     pip install -r requirements.txt
-    ./manage.py migrate
-    ./manage.py shell -c "from django.contrib.auth.models import User; User.objects.create_superuser('vistoq', 'admin@example.com', 'vistoq')"
-    export PANORAMA_IP=192.168.55.8
-    export PANORAMA_USERNAME=admin
-    export PANORAMA_PASSWORD=admin
-    ./manage.py runserver 9999
+    pip install -r cnc/requirements.txt
+    ./cnc/manage.py migrate
+    ./cnc/manage.py shell -c "from django.contrib.auth.models import User; User.objects.create_superuser('paloalto', 'admin@example.com', 'tort')"
+    ./cnc/manage.py runserver 9999
