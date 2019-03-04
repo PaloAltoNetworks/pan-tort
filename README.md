@@ -12,7 +12,7 @@ docker run -p 8088:80 paloaltonetworks/pan-tort:latest
 ```
 Once the container is up and running - point your browser to http://localhost:8088
 
-Login is paloalto/tort
+***Login is paloalto/tort***
 
 NOTE:  This does not support pushing the results to ELK - yet
 
