@@ -6,7 +6,7 @@ attrs==18.2.0
 autobahn==19.1.1
 Automat==0.7.0
 billiard==3.5.0.5
-celery==4.2.1
+celery==5.2.2
 certifi==2018.11.29
 cffi==1.11.5
 channels==2.1.6
