@@ -38,7 +38,7 @@ PyHamcrest==1.9.0
 python-dateutil==2.8.0
 pytz==2018.7
 PyYAML==3.13
-requests==2.21.0
+requests==2.31.0
 six==1.12.0
 smmap2==2.0.5
 Twisted==18.9.0
