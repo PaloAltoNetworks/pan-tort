@@ -12,7 +12,7 @@ cffi==1.11.5
 channels==2.1.6
 chardet==3.0.4
 constantly==15.1.0
-cryptography==2.4.2
+cryptography==41.0.2
 daphne==2.2.4
 Django==2.1.5
 django-downloadview==1.9
