@@ -22,7 +22,7 @@ docker-pycreds==0.4.0
 elasticsearch==6.3.1
 elasticsearch-dsl==6.3.1
 gitdb2==2.0.5
-GitPython==2.1.11
+GitPython==3.1.32
 hyperlink==18.0.0
 idna==2.8
 incremental==17.5.0
